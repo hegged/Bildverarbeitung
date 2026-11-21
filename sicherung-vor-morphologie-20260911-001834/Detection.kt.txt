@@ -1,0 +1,62 @@
+package detection
+
+import java.awt.image.BufferedImage
+
+// Das Original bleibt farbig und wird nur gelesen.
+// Für getrennte Masken, Kandidatenlisten und Ausschnitte erweitern wir später
+// den Zustand. Beschriftete Vorschaubilder sind keine Algorithmus-Eingaben.
+data class StepResult(val image: BufferedImage, val message: String)
+
+data class ProcessingStep(
+    val name: String,
+    val process: (originalImage: BufferedImage, previousImage: BufferedImage) -> StepResult
+)
+
+fun createProcessingSteps(): List<ProcessingStep> = listOf(
+    ProcessingStep("Original") { originalImage, _ ->
+        StepResult(originalImage, "Ausgangsbild. Als Nächstes werden rote, danach gelbe Bereiche gesucht.")
+    },
+    ProcessingStep("Rotmaske") { originalImage, _ ->
+        val redMask = createRedMask(originalImage)
+        StepResult(redMask, "Rotmaske: Farbton 20–330°, Sättigung mindestens 15 %, Helligkeit mindestens 12 %. Das sind Farb-Kandidaten, noch keine erkannten Schilder.")
+    },
+    ProcessingStep("Gelbmaske") { originalImage, _ ->
+        val yellowMask = createYellowMask(originalImage)
+        StepResult(yellowMask, "Gelbmaske: Farbton 30–60°, Sättigung mindestens 10 %, Helligkeit mindestens 15 %. Das sind Farb-Kandidaten, noch keine erkannten Schilder.")
+    },
+    ProcessingStep("Farbmasken bereinigen") { _, previousImage ->
+        // HIER ERGÄNZEN: opening/closing auf jeder Binärmaske separat anwenden.
+        // Kleine Störungen entfernen, Lücken schließen, dünne Schildränder erhalten.
+        StepResult(previousImage, "NOCH OFFEN: Farbmasken mit Erosion und Dilatation bereinigen. Vorschau unverändert.")
+    },
+    ProcessingStep("Zusammenhängende Bereiche") { _, previousImage ->
+        // HIER ERGÄNZEN: findConnectedComponents mit 8er-Nachbarschaft.
+        // Sehr kleine Bereiche verwerfen; Rot-/Gelbzugehörigkeit und Koordinaten behalten.
+        // Kandidaten auf einer Kopie des Originals mit Rahmen visualisieren.
+        StepResult(previousImage, "NOCH OFFEN: Maskenpixel zu Kandidaten verbinden und kleine Störungen aussortieren. Vorschau unverändert.")
+    },
+    ProcessingStep("Konturen und Form prüfen") { _, previousImage ->
+        // HIER ERGÄNZEN: extractContours und measureShape für jeden Kandidaten.
+        // Außenkontur vereinfachen; Ecken, Seitenverhältnis und Formähnlichkeit prüfen.
+        // Bei Bedarf Graustufen/Glättung/Sobel auf Originalausschnitten ergänzen.
+        StepResult(previousImage, "NOCH OFFEN: Dreiecke, Vierecke und achteckige Formen prüfen. Noch keine endgültige Schildklasse. Vorschau unverändert.")
+    },
+    ProcessingStep("Ausrichtung der Kandidaten") { _, previousImage ->
+        // HIER ERGÄNZEN: Kandidaten aus dem Original ausschneiden.
+        // normalizeCandidate: bei mehrdeutiger Form mehrere plausible Drehungen testen.
+        // Originalkoordinaten behalten. Rotation korrigiert keine Perspektivverzerrung.
+        StepResult(previousImage, "NOCH OFFEN: Ausschnitte und mögliche Ausrichtungen vorbereiten. Mehrdeutige Drehungen erst mit Details bewerten. Vorschau unverändert.")
+    },
+    ProcessingStep("Details und Schrift prüfen") { _, previousImage ->
+        // HIER ERGÄNZEN: compareDetails, z. B. Referenzvergleich für STOP/Kreuzungssymbol.
+        // Ausgerichtete Ausschnitte vergleichen und beste Orientierung bestimmen.
+        // Ein rotes Dreieck allein identifiziert das Vorfahrt-Schild noch nicht.
+        StepResult(previousImage, "NOCH OFFEN: Innere Symbole und gegebenenfalls STOP-Schrift prüfen. Vorschau unverändert.")
+    },
+    ProcessingStep("Klassifikation und Ergebnis") { originalImage, _ ->
+        // HIER ERGÄNZEN: classifyCandidate aus Farbe, Form und Detailmerkmalen.
+        // Bei unzureichender Übereinstimmung unbekannt ausgeben.
+        // Rahmen und deutsche Beschriftungen auf einer Kopie des Originals zeichnen.
+        StepResult(originalImage, "NOCH OFFEN: Schildtyp zuordnen oder als unbekannt markieren. Noch keine Erkennung durchgeführt. Angezeigt wird das Original.")
+    }
+)

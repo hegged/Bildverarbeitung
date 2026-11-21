@@ -1,0 +1,64 @@
+package detection
+
+import java.awt.Color
+import java.awt.image.BufferedImage
+
+data class HsvColor(val hue: Double, val saturation: Double, val value: Double)
+
+fun rgbToHsv(color: Color): HsvColor {
+    val hsv = Color.RGBtoHSB(
+        color.red, color.green, color.blue, null
+    )
+
+    return HsvColor(
+        hue = hsv[0].toDouble() * 360.0,
+        saturation = hsv[1].toDouble(),
+        value = hsv[2].toDouble()
+    )
+}
+
+fun createRedMask(
+    originalImage: BufferedImage,
+    minimumHue: Double = 20.0,
+    maximumHue: Double = 330.0,
+    minimumSaturation: Double = 0.15,
+    minimumValue: Double = 0.12
+): BufferedImage {
+    val mask = BufferedImage(originalImage.width, originalImage.height, BufferedImage.TYPE_BYTE_BINARY)
+    for (y in 0..<originalImage.height) {
+        for (x in 0..<originalImage.width) {
+            val color = Color(originalImage.getRGB(x, y), true)
+            val hsv = rgbToHsv(color)
+
+            // Rot liegt an beiden Enden des Farbkreises, um 0 bzw. 360 Grad.
+            val isRedHue = hsv.hue <= minimumHue || hsv.hue >= maximumHue
+            val isRed = color.alpha > 0 && isRedHue &&
+                hsv.saturation >= minimumSaturation && hsv.value >= minimumValue
+
+            mask.setRGB(x, y, if (isRed) Color.WHITE.rgb else Color.BLACK.rgb)
+        }
+    }
+    return mask
+}
+
+fun createYellowMask(
+    originalImage: BufferedImage,
+    minimumHue: Double = 30.0,
+    maximumHue: Double = 60.0,
+    minimumSaturation: Double = 0.10,
+    minimumValue: Double = 0.15
+): BufferedImage {
+    val mask = BufferedImage(originalImage.width, originalImage.height, BufferedImage.TYPE_BYTE_BINARY)
+    for (y in 0..<originalImage.height) {
+        for (x in 0..<originalImage.width) {
+            val color = Color(originalImage.getRGB(x, y), true)
+            val hsv = rgbToHsv(color)
+            val isYellowHue = hsv.hue in minimumHue..maximumHue
+            val isYellow = color.alpha > 0 && isYellowHue &&
+                hsv.saturation >= minimumSaturation && hsv.value >= minimumValue
+
+            mask.setRGB(x, y, if (isYellow) Color.WHITE.rgb else Color.BLACK.rgb)
+        }
+    }
+    return mask
+}
