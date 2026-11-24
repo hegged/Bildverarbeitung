@@ -10,6 +10,7 @@ class ProcessingContext(val originalImage: BufferedImage) {
     var dilatedYellowMask: BufferedImage? = null
     var cleanedRedMask: BufferedImage? = null
     var cleanedYellowMask: BufferedImage? = null
+    var candidates: List<ConnectedComponent> = emptyList()
 }
 
 data class StepResult(val image: BufferedImage, val message: String)
@@ -58,12 +59,14 @@ fun createProcessingSteps(): List<ProcessingStep> = listOf(
         context.cleanedYellowMask = cleaned
         StepResult(cleaned, "Gelbmaske – Erosion nach Dilatation (Closing). Beide bereinigten Farbmasken sind getrennt gespeichert. Kleine weiße Störflecken werden später anhand ihrer Fläche aussortiert; die Bereichssuche ist noch offen.")
     },
-    ProcessingStep("Zusammenhängende Bereiche") { _, previousImage ->
-        // HIER ERGÄNZEN: findConnectedComponents mit 8er-Nachbarschaft.
-        // context.cleanedRedMask und context.cleanedYellowMask getrennt auswerten.
-        // Sehr kleine Bereiche verwerfen; Rot-/Gelbzugehörigkeit und Koordinaten behalten.
-        // Kandidaten auf einer Kopie des Originals mit Rahmen visualisieren.
-        StepResult(previousImage, "NOCH OFFEN: Maskenpixel zu Kandidaten verbinden und kleine Störungen aussortieren. Vorschau unverändert.")
+    ProcessingStep("Zusammenhängende Bereiche") { context, _ ->
+        val redMask = requireNotNull(context.cleanedRedMask) { "Zuerst die rote Maske bereinigen." }
+        val yellowMask = requireNotNull(context.cleanedYellowMask) { "Zuerst die gelbe Maske bereinigen." }
+        val red = findConnectedComponents(redMask, CandidateColor.RED)
+        val yellow = findConnectedComponents(yellowMask, CandidateColor.YELLOW)
+        context.candidates = red + yellow
+        val preview = drawCandidateBoxes(context.originalImage, context.candidates)
+        StepResult(preview, "8er-Nachbarschaft: ${red.size} rote und ${yellow.size} gelbe Bereiche mit mindestens 9 Pixeln. Die Rahmen zeigen nur Farb-Kandidaten; Form und Schildtyp sind noch ungeprüft.")
     },
     ProcessingStep("Konturen und Form prüfen") { _, previousImage ->
         // HIER ERGÄNZEN: extractContours und measureShape für jeden Kandidaten.
