@@ -74,12 +74,23 @@ fun drawCandidateBoxes(original: BufferedImage, candidates: List<ConnectedCompon
     val graphics = result.createGraphics()
     try {
         graphics.drawImage(original, 0, 0, null)
+        // Die Vorschau wird oft stark verkleinert. Eine Bildpixel-Linie wäre dann kaum sichtbar.
+        val preferredThickness = maxOf(2, minOf(original.width, original.height) / 250)
         for (candidate in candidates) {
             graphics.color = when (candidate.color) {
                 CandidateColor.RED -> Color.RED
                 CandidateColor.YELLOW -> Color.YELLOW
             }
-            graphics.drawRect(candidate.x, candidate.y, candidate.width - 1, candidate.height - 1)
+            // Alle vier Streifen liegen innerhalb der Bounding Box, auch direkt am Bildrand.
+            val thickness = minOf(preferredThickness, candidate.width, candidate.height)
+            val x = candidate.x
+            val y = candidate.y
+            val width = candidate.width
+            val height = candidate.height
+            graphics.fillRect(x, y, width, thickness)
+            graphics.fillRect(x, y + height - thickness, width, thickness)
+            graphics.fillRect(x, y, thickness, height)
+            graphics.fillRect(x + width - thickness, y, thickness, height)
         }
     } finally {
         graphics.dispose()
