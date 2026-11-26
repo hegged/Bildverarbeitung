@@ -34,10 +34,7 @@ fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
             }
         }
 
-        val (redMask, yellowMask) = both(
-            { createRedMask(original) },
-            { createYellowMask(original) }
-        )
+        val (redMask, yellowMask) = createColorMasks(original)
         publish(
             "HSV-Farbfilter: Rot 330–360°/0–20°, Gelb 30–60°. Weiß bedeutet Farb-Kandidat.",
             StageImage("2. Farbfilter · Rot", redMask),
