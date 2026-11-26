@@ -78,20 +78,32 @@ class TimelinePanel(private val onSelectionChanged: (Int, ProcessingStage) -> Un
     fun setStages(readyStages: List<ProcessingStage>) {
         require(readyStages.isNotEmpty())
         clear()
-        stages = readyStages.toList()
-        stages.forEachIndexed { index, stage ->
-            val title = stage.images.first().title.substringBefore(" ·")
-            val button = JButton(title, ImageIcon(thumbnailIcon(stage))).apply {
-                horizontalTextPosition = SwingConstants.CENTER
-                verticalTextPosition = SwingConstants.BOTTOM
-                preferredSize = Dimension(148, 116)
-                toolTipText = stage.message
-                addActionListener { showStage(index) }
-            }
-            thumbnails += button
-            track.add(button)
-        }
+        readyStages.forEach(::appendStage)
         showStage(0)
+    }
+
+    /** Adds a completed stage on the Swing thread while processing continues. */
+    fun appendStage(stage: ProcessingStage) {
+        val followLatest = activeIndex == stages.lastIndex
+        val index = stages.size
+        stages = stages + stage
+        val title = stage.images.first().title.substringBefore(" ·")
+        val button = JButton(title, ImageIcon(thumbnailIcon(stage))).apply {
+            horizontalTextPosition = SwingConstants.CENTER
+            verticalTextPosition = SwingConstants.BOTTOM
+            preferredSize = Dimension(148, 116)
+            toolTipText = stage.message
+            addActionListener { showStage(index) }
+        }
+        thumbnails += button
+        track.add(button)
+        track.preferredSize = Dimension(maxOf(900, stages.size * 158 + 10), 148)
+        track.revalidate()
+        if (followLatest) showStage(index) else {
+            counter.text = "Schritt " + (activeIndex + 1) + " von " + stages.size
+            nextButton.isEnabled = activeIndex < stages.lastIndex
+            track.repaint()
+        }
     }
 
     fun showPrevious() = showStage(activeIndex - 1)

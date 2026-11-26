@@ -22,6 +22,7 @@ import javax.swing.SwingWorker
 class ProcessingWindow(private val inputDirectory: File, private val imageFiles: List<File>) : JFrame("Bildverarbeitung – Verarbeitungsschritte") {
     private var imageIndex = -1
     private var isBusy = false
+    private var processingComplete = false
     private val titleLabel = JLabel("Bilder werden vorbereitet …")
     private val statusText = JTextArea(2, 60).apply {
         isEditable = false
@@ -52,7 +53,7 @@ class ProcessingWindow(private val inputDirectory: File, private val imageFiles:
         registerKey(KeyEvent.VK_LEFT, "previousStep") { timeline.showPrevious() }
         registerKey(KeyEvent.VK_RIGHT, "nextStep") { timeline.showNext() }
         registerKey(KeyEvent.VK_SPACE, "advance") {
-            if (timeline.isAtLastStage) loadNextImage() else timeline.showNext()
+            if (processingComplete && timeline.isAtLastStage) loadNextImage() else timeline.showNext()
         }
         size = Dimension(1400, 900)
         setLocationRelativeTo(null)
@@ -69,13 +70,13 @@ class ProcessingWindow(private val inputDirectory: File, private val imageFiles:
             .put(KeyStroke.getKeyStroke(keyCode, 0, true), actionName)
         rootPane.actionMap.put(actionName, object : AbstractAction() {
             override fun actionPerformed(event: ActionEvent) {
-                if (!isBusy) action()
+                action()
             }
         })
     }
 
     private fun updateNextImageButton() {
-        val atResult = timeline.isAtLastStage
+        val atResult = processingComplete && timeline.isAtLastStage
         nextImageButton.isVisible = atResult
         nextImageButton.text = if (imageIndex == imageFiles.lastIndex) "Letztes Bild" else "Nächstes Bild"
         nextImageButton.isEnabled = !isBusy && atResult && imageIndex < imageFiles.lastIndex
@@ -85,24 +86,30 @@ class ProcessingWindow(private val inputDirectory: File, private val imageFiles:
         if (isBusy || imageIndex >= imageFiles.lastIndex) return
         imageIndex++
         isBusy = true
+        processingComplete = false
         timeline.clear()
         nextImageButton.isVisible = false
         val file = imageFiles[imageIndex]
         val imageName = file.relativeTo(inputDirectory).path
         titleLabel.text = "Bild ${imageIndex + 1}/${imageFiles.size}: $imageName"
-        statusText.text = "Alle Verarbeitungsschritte werden berechnet …"
+        statusText.text = "Bild wird geladen …"
 
-        // Erst nach der vollständigen Berechnung erscheint der Zeitstrahl mit allen Schritten.
-        object : SwingWorker<List<ProcessingStage>, Unit>() {
-            override fun doInBackground(): List<ProcessingStage> {
+        object : SwingWorker<Unit, ProcessingStage>() {
+            override fun doInBackground() {
                 val original = ImageIO.read(file) ?: error("Das Bildformat konnte nicht gelesen werden.")
-                return buildList { processStages(original) { add(it) } }
+                processStages(original) { publish(it) }
+            }
+
+            override fun process(chunks: MutableList<ProcessingStage>) {
+                chunks.forEach(timeline::appendStage)
             }
 
             override fun done() {
                 isBusy = false
                 try {
-                    timeline.setStages(get())
+                    get()
+                    processingComplete = true
+                    updateNextImageButton()
                 } catch (exception: Exception) {
                     val cause = exception.cause?.cause ?: exception.cause ?: exception
                     statusText.text = "Fehler bei $imageName: ${cause.message}."
