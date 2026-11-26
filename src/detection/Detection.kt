@@ -13,13 +13,6 @@ data class ProcessingStage(
 
 /** Processes red and yellow in the same phase, then provides the finished phase to the timeline. */
 fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
-    fun publish(message: String, vararg images: StageImage) {
-        // Keep only small previews in the UI; the original-sized intermediate images can be freed.
-        onStage(ProcessingStage(images.map { it.copy(image = thumbnail(it.image)) }, message))
-    }
-
-    publish("Originalbild. Die Farbfilterung beginnt mit Rot und Gelb gemeinsam.", StageImage("1. Original", original))
-
     val workers = Executors.newFixedThreadPool(2)
     try {
         fun <T> both(red: () -> T, yellow: () -> T): Pair<T, T> {
@@ -33,6 +26,33 @@ fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
                 throw exception
             }
         }
+
+        var previousImage: BufferedImage? = null
+        var previousThumbnail: BufferedImage? = null
+        fun preview(image: BufferedImage): BufferedImage {
+            if (image !== previousImage) {
+                previousImage = image
+                previousThumbnail = thumbnail(image)
+            }
+            return previousThumbnail!!
+        }
+
+        fun publish(message: String, vararg images: StageImage) {
+            // The two colour previews are independent and can be scaled in parallel.
+            val previews = if (images.size == 2) {
+                val (red, yellow) = both(
+                    { thumbnail(images[0].image) },
+                    { thumbnail(images[1].image) }
+                )
+                listOf(images[0].copy(image = red), images[1].copy(image = yellow))
+            } else {
+                // TODO steps reuse the same candidate preview without scaling it again.
+                images.map { it.copy(image = preview(it.image)) }
+            }
+            onStage(ProcessingStage(previews, message))
+        }
+
+        publish("Originalbild. Die Farbfilterung beginnt mit Rot und Gelb gemeinsam.", StageImage("1. Original", original))
 
         val (redMask, yellowMask) = createColorMasks(original)
         publish(
@@ -76,9 +96,17 @@ fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
         )
 
         val result = drawCandidateBoxes(original, redCandidates + yellowCandidates)
+        for (stage in listOf(
+            checkContourAndShape(result),
+            orientCandidates(result),
+            checkDetailsAndText(result),
+            classifyCandidates(result)
+        )) {
+            publish(stage.message, *stage.images.toTypedArray())
+        }
         publish(
             "Farbliche Kandidaten auf dem Original. Formprüfung, Details und Zuordnung zu den vier Schildtypen sind noch offen.",
-            StageImage("6. Ergebnis · Kandidaten auf Original", result)
+            StageImage("10. Ergebnis · Kandidaten auf Original", result)
         )
     } finally {
         workers.shutdownNow()
