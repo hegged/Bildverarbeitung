@@ -75,7 +75,7 @@ fun drawCandidateBoxes(original: BufferedImage, candidates: List<ConnectedCompon
     try {
         graphics.drawImage(original, 0, 0, null)
         // Die Vorschau wird oft stark verkleinert. Eine Bildpixel-Linie wäre dann kaum sichtbar.
-        val preferredThickness = maxOf(2, minOf(original.width, original.height) / 250)
+        val preferredThickness = maxOf(2, minOf(original.width, original.height) / 150)
         for (candidate in candidates) {
             graphics.color = when (candidate.color) {
                 CandidateColor.RED -> Color.RED
