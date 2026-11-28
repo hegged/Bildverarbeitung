@@ -7,7 +7,6 @@ import java.awt.Dimension
 import java.awt.event.ActionEvent
 import java.awt.event.KeyEvent
 import java.io.File
-import javax.imageio.ImageIO
 import javax.swing.AbstractAction
 import javax.swing.BorderFactory
 import javax.swing.JButton
@@ -96,7 +95,7 @@ class ProcessingWindow(private val inputDirectory: File, private val imageFiles:
 
         object : SwingWorker<Unit, ProcessingStage>() {
             override fun doInBackground() {
-                val original = ImageIO.read(file) ?: error("Das Bildformat konnte nicht gelesen werden.")
+                val original = loadImage(file)
                 processStages(original) { publish(it) }
             }
 
