@@ -5,6 +5,14 @@ import java.awt.image.BufferedImage
 
 enum class CandidateColor { RED, YELLOW }
 
+data class PixelPoint(val x: Int, val y: Int)
+
+/** A small absolute floor plus a modest image-size adjustment for camera photos. */
+fun minimumComponentArea(width: Int, height: Int): Int {
+    require(width > 0 && height > 0)
+    return maxOf(64, (width.toLong() * height / 50_000).coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+}
+
 // Bounding box coordinates refer to the original image, including its top-left pixel.
 data class ConnectedComponent(
     val color: CandidateColor,
@@ -12,14 +20,15 @@ data class ConnectedComponent(
     val y: Int,
     val width: Int,
     val height: Int,
-    val area: Int
+    val area: Int,
+    val contour: List<PixelPoint> = emptyList()
 )
 
 /** Groups white pixels in a binary mask using 8-neighbour connectivity. */
 fun findConnectedComponents(
     mask: BufferedImage,
     color: CandidateColor,
-    minArea: Int = 9
+    minArea: Int = minimumComponentArea(mask.width, mask.height)
 ): List<ConnectedComponent> {
     require(minArea > 0) { "minArea must be positive" }
     val width = mask.width
@@ -62,7 +71,21 @@ fun findConnectedComponents(
         }
 
         if (tail >= minArea) {
-            components += ConnectedComponent(color, left, top, right - left + 1, bottom - top + 1, tail)
+            val contour = ArrayList<PixelPoint>()
+            for (position in 0 until tail) {
+                val pixel = queue[position]
+                val x = pixel % width
+                val y = pixel / width
+                if (x == 0 || x == width - 1 || y == 0 || y == height - 1 ||
+                    (pixels[pixel - 1] and 0x00ffffff) != 0x00ffffff ||
+                    (pixels[pixel + 1] and 0x00ffffff) != 0x00ffffff ||
+                    (pixels[pixel - width] and 0x00ffffff) != 0x00ffffff ||
+                    (pixels[pixel + width] and 0x00ffffff) != 0x00ffffff
+                ) {
+                    contour += PixelPoint(x, y)
+                }
+            }
+            components += ConnectedComponent(color, left, top, right - left + 1, bottom - top + 1, tail, contour)
         }
     }
     return components

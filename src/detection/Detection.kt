@@ -81,23 +81,24 @@ fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
             StageImage("4. Closing · Gelb", cleanedYellow)
         )
 
+        val minArea = minimumComponentArea(original.width, original.height)
         val (redCandidates, yellowCandidates) = both(
-            { findConnectedComponents(cleanedRed, CandidateColor.RED) },
-            { findConnectedComponents(cleanedYellow, CandidateColor.YELLOW) }
+            { findConnectedComponents(cleanedRed, CandidateColor.RED, minArea) },
+            { findConnectedComponents(cleanedYellow, CandidateColor.YELLOW, minArea) }
         )
         val (redPreview, yellowPreview) = both(
             { drawCandidateBoxes(original, redCandidates) },
             { drawCandidateBoxes(original, yellowCandidates) }
         )
         publish(
-            "8er-Nachbarschaft, mindestens 9 Pixel: ${redCandidates.size} rote und ${yellowCandidates.size} gelbe Bereiche.",
+            "8er-Nachbarschaft, mindestens $minArea Pixel: ${redCandidates.size} rote und ${yellowCandidates.size} gelbe Bereiche.",
             StageImage("5. Bereiche · Rot", redPreview),
             StageImage("5. Bereiche · Gelb", yellowPreview)
         )
 
         val result = drawCandidateBoxes(original, redCandidates + yellowCandidates)
         for (stage in listOf(
-            checkContourAndShape(result),
+            checkContourAndShape(result, redCandidates + yellowCandidates),
             orientCandidates(result),
             checkDetailsAndText(result),
             classifyCandidates(result)
@@ -105,7 +106,7 @@ fun processStages(original: BufferedImage, onStage: (ProcessingStage) -> Unit) {
             publish(stage.message, *stage.images.toTypedArray())
         }
         publish(
-            "Farbliche Kandidaten auf dem Original. Formprüfung, Details und Zuordnung zu den vier Schildtypen sind noch offen.",
+            "Farbliche Kandidaten auf dem Original. Formhinweise in Schritt 6; Details und Zuordnung zu den vier Schildtypen sind noch offen.",
             StageImage("10. Ergebnis · Kandidaten auf Original", result)
         )
     } finally {
